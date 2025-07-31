@@ -1,0 +1,42 @@
+sources:
+    ibmi-system:
+        kind: db2i
+        host: ${DB2I_HOST}
+        port: ${DB2I_PORT}
+        database: db2i
+        user: ${DB2I_USER}
+        password: ${DB2I_PASSWORD}
+
+tools:
+  execute_sql:
+    source: ibmi-system
+    kind: db2i-execute-sql
+    description: "Execute SQL statements on the IBM i system"
+  system_status:
+    source: ibmi-system
+    kind: db2i-sql
+    description: "Overall system performance statistics with CPU, memory, and I/O metrics"
+    parameters: []
+    statement: |
+      SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'YES',DETAILED_INFO=>'ALL')) X
+  active_job_info:
+    source: ibmi-system
+    kind: db2i-sql
+    description: "Find the top 10 consumers of CPU in the QUSRWRK and QSYSWRK subsystems"
+    parameters:
+      - name: limit
+        type: integer
+        default: 10
+        description: "Number of top CPU consumers to return"
+    statement: |
+      SELECT CPU_TIME, A.* FROM 
+      TABLE(QSYS2.ACTIVE_JOB_INFO(SUBSYSTEM_LIST_FILTER => 'QUSRWRK,QSYSWRK')) A 
+      ORDER BY CPU_TIME DESC 
+      FETCH FIRST ? ROWS ONLY
+
+
+toolsets:
+  performance:
+      - execute_sql
+      - system_status
+      - active_job_info
