@@ -25,14 +25,15 @@ import (
 	"github.com/googleapis/genai-toolbox/internal/sources"
 	firestoreds "github.com/googleapis/genai-toolbox/internal/sources/firestore"
 	"github.com/googleapis/genai-toolbox/internal/tools"
+	"github.com/googleapis/genai-toolbox/internal/tools/firestore/util"
 )
 
 // Constants for tool configuration
 const (
-	kind              = "firestore-query-collection"
-	defaultLimit      = 100
-	defaultAnalyze    = false
-	maxFilterLength   = 100 // Maximum filters to prevent abuse
+	kind            = "firestore-query-collection"
+	defaultLimit    = 100
+	defaultAnalyze  = false
+	maxFilterLength = 100 // Maximum filters to prevent abuse
 )
 
 // Parameter keys
@@ -46,16 +47,16 @@ const (
 
 // Firestore operators
 var validOperators = map[string]bool{
-	"<":                 true,
-	"<=":                true,
-	">":                 true,
-	">=":                true,
-	"==":                true,
-	"!=":                true,
+	"<":                  true,
+	"<=":                 true,
+	">":                  true,
+	">=":                 true,
+	"==":                 true,
+	"!=":                 true,
 	"array-contains":     true,
 	"array-contains-any": true,
-	"in":                true,
-	"not-in":            true,
+	"in":                 true,
+	"not-in":             true,
 }
 
 // Error messages
@@ -128,12 +129,8 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 
 	// Create parameters
 	parameters := createParameters()
-	
-	mcpManifest := tools.McpManifest{
-		Name:        cfg.Name,
-		Description: cfg.Description,
-		InputSchema: parameters.McpManifest(),
-	}
+
+	mcpManifest := tools.GetMcpManifest(cfg.Name, cfg.Description, cfg.AuthRequired, parameters)
 
 	// finish tool setup
 	t := Tool{
@@ -151,44 +148,44 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 // createParameters creates the parameter definitions for the tool
 func createParameters() tools.Parameters {
 	collectionPathParameter := tools.NewStringParameter(
-		collectionPathKey, 
-		"The path to the Firestore collection to query",
+		collectionPathKey,
+		"The relative path to the Firestore collection to query (e.g., 'users' or 'users/userId/posts'). Note: This is a relative path, NOT an absolute path like 'projects/{project_id}/databases/{database_id}/documents/...'",
 	)
-	
+
 	filtersDescription := `Array of filter objects to apply to the query. Each filter is a JSON string with:
 - field: The field name to filter on
 - op: The operator to use ("<", "<=", ">", ">=", "==", "!=", "array-contains", "array-contains-any", "in", "not-in")
 - value: The value to compare against (can be string, number, boolean, or array)
 Example: {"field": "age", "op": ">", "value": 18}`
-	
+
 	filtersParameter := tools.NewArrayParameter(
-		filtersKey, 
+		filtersKey,
 		filtersDescription,
 		tools.NewStringParameter("item", "JSON string representation of a filter object"),
 	)
-	
+
 	orderByParameter := tools.NewStringParameter(
-		orderByKey, 
+		orderByKey,
 		"JSON string specifying the field and direction to order by (e.g., {\"field\": \"name\", \"direction\": \"ASCENDING\"}). Leave empty if not specified",
 	)
-	
+
 	limitParameter := tools.NewIntParameterWithDefault(
-		limitKey, 
-		defaultLimit, 
+		limitKey,
+		defaultLimit,
 		"The maximum number of documents to return",
 	)
 
 	analyzeQueryParameter := tools.NewBooleanParameterWithDefault(
-		analyzeQueryKey, 
-		defaultAnalyze, 
+		analyzeQueryKey,
+		defaultAnalyze,
 		"If true, returns query explain metrics including execution statistics",
 	)
 
 	return tools.Parameters{
-		collectionPathParameter, 
-		filtersParameter, 
-		orderByParameter, 
-		limitParameter, 
+		collectionPathParameter,
+		filtersParameter,
+		orderByParameter,
+		limitParameter,
 		analyzeQueryParameter,
 	}
 }
@@ -220,7 +217,7 @@ func (f *FilterConfig) Validate() error {
 	if f.Field == "" {
 		return fmt.Errorf("filter field cannot be empty")
 	}
-	
+
 	if !validOperators[f.Op] {
 		ops := make([]string, 0, len(validOperators))
 		for op := range validOperators {
@@ -228,11 +225,11 @@ func (f *FilterConfig) Validate() error {
 		}
 		return fmt.Errorf(errInvalidOperator, f.Op, ops)
 	}
-	
+
 	if f.Value == nil {
 		return fmt.Errorf(errMissingFilterValue, f.Field)
 	}
-	
+
 	return nil
 }
 
@@ -267,7 +264,7 @@ type QueryResponse struct {
 }
 
 // Invoke executes the Firestore query based on the provided parameters
-func (t Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
+func (t Tool) Invoke(ctx context.Context, params tools.ParamValues, accessToken tools.AccessToken) (any, error) {
 	// Parse parameters
 	queryParams, err := t.parseQueryParameters(params)
 	if err != nil {
@@ -296,11 +293,16 @@ type queryParameters struct {
 // parseQueryParameters extracts and validates parameters from the input
 func (t Tool) parseQueryParameters(params tools.ParamValues) (*queryParameters, error) {
 	mapParams := params.AsMap()
-	
+
 	// Get collection path
 	collectionPath, ok := mapParams[collectionPathKey].(string)
 	if !ok || collectionPath == "" {
 		return nil, fmt.Errorf(errMissingCollectionPath, collectionPathKey)
+	}
+
+	// Validate collection path
+	if err := util.ValidateCollectionPath(collectionPath); err != nil {
+		return nil, fmt.Errorf("invalid collection path: %w", err)
 	}
 
 	result := &queryParameters{
@@ -480,31 +482,31 @@ func (t Tool) getExplainMetrics(docIterator *firestoreapi.DocumentIterator) (map
 	}
 
 	metricsData := make(map[string]any)
-	
+
 	// Add plan summary if available
 	if explainMetrics.PlanSummary != nil {
 		planSummary := make(map[string]any)
 		planSummary["indexesUsed"] = explainMetrics.PlanSummary.IndexesUsed
 		metricsData["planSummary"] = planSummary
 	}
-	
+
 	// Add execution stats if available
 	if explainMetrics.ExecutionStats != nil {
 		executionStats := make(map[string]any)
 		executionStats["resultsReturned"] = explainMetrics.ExecutionStats.ResultsReturned
 		executionStats["readOperations"] = explainMetrics.ExecutionStats.ReadOperations
-		
+
 		if explainMetrics.ExecutionStats.ExecutionDuration != nil {
 			executionStats["executionDuration"] = explainMetrics.ExecutionStats.ExecutionDuration.String()
 		}
-		
+
 		if explainMetrics.ExecutionStats.DebugStats != nil {
 			executionStats["debugStats"] = *explainMetrics.ExecutionStats.DebugStats
 		}
-		
+
 		metricsData["executionStats"] = executionStats
 	}
-	
+
 	return metricsData, nil
 }
 
@@ -526,4 +528,8 @@ func (t Tool) McpManifest() tools.McpManifest {
 // Authorized checks if the tool is authorized based on verified auth services
 func (t Tool) Authorized(verifiedAuthServices []string) bool {
 	return tools.IsAuthorized(t.AuthRequired, verifiedAuthServices)
+}
+
+func (t Tool) RequiresClientAuthorization() bool {
+	return false
 }

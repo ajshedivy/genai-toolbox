@@ -39,6 +39,8 @@ documentation](https://googleapis.github.io/genai-toolbox/).
   - [Tools](#tools)
   - [Toolsets](#toolsets)
 - [Versioning](#versioning)
+  - [Pre-1.0.0 Versioning](#pre-100-versioning)
+  - [Post-1.0.0 Versioning](#post-100-versioning)
 - [Contributing](#contributing)
 - [Community](#community)
 
@@ -112,13 +114,57 @@ following instructions for your OS and CPU architecture.
 To install Toolbox as a binary:
 
 <!-- {x-release-please-start-version} -->
-```sh
-# see releases page for other versions
-export VERSION=0.9.0
-curl -O https://storage.googleapis.com/genai-toolbox/v$VERSION/linux/amd64/toolbox
-chmod +x toolbox
-```
-
+> <details>
+> <summary>Linux (AMD64)</summary>
+>
+> To install Toolbox as a binary on Linux (AMD64):
+>
+> ```sh
+> # see releases page for other versions
+> export VERSION=0.17.0
+> curl -L -o toolbox https://storage.googleapis.com/genai-toolbox/v$VERSION/linux/amd64/toolbox
+> chmod +x toolbox
+> ```
+>
+> </details>
+> <details>
+> <summary>macOS (Apple Silicon)</summary>
+>
+> To install Toolbox as a binary on macOS (Apple Silicon):
+>
+> ```sh
+> # see releases page for other versions
+> export VERSION=0.17.0
+> curl -L -o toolbox https://storage.googleapis.com/genai-toolbox/v$VERSION/darwin/arm64/toolbox
+> chmod +x toolbox
+> ```
+>
+> </details>
+> <details>
+> <summary>macOS (Intel)</summary>
+>
+> To install Toolbox as a binary on macOS (Intel):
+>
+> ```sh
+> # see releases page for other versions
+> export VERSION=0.17.0
+> curl -L -o toolbox https://storage.googleapis.com/genai-toolbox/v$VERSION/darwin/amd64/toolbox
+> chmod +x toolbox
+> ```
+>
+> </details>
+> <details>
+> <summary>Windows (AMD64)</summary>
+>
+> To install Toolbox as a binary on Windows (AMD64):
+>
+> ```powershell
+> # see releases page for other versions
+> $VERSION = "0.17.0"
+> Invoke-WebRequest -Uri "https://storage.googleapis.com/genai-toolbox/v$VERSION/windows/amd64/toolbox.exe" -OutFile "toolbox.exe"
+> ```
+>
+> </details>
 </details>
 
 <details>
@@ -127,8 +173,19 @@ You can also install Toolbox as a container:
 
 ```sh
 # see releases page for other versions
-export VERSION=0.9.0
+export VERSION=0.17.0
 docker pull us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:$VERSION
+```
+
+</details>
+
+<details>
+<summary>Homebrew</summary>
+
+To install Toolbox using Homebrew on macOS or Linux:
+
+```sh
+brew install mcp-toolbox
 ```
 
 </details>
@@ -140,9 +197,20 @@ To install from source, ensure you have the latest version of
 [Go installed](https://go.dev/doc/install), and then run the following command:
 
 ```sh
-go install github.com/googleapis/genai-toolbox@v0.9.0
+go install github.com/googleapis/genai-toolbox@v0.17.0
 ```
 <!-- {x-release-please-end} -->
+
+</details>
+
+<details>
+<summary>Gemini CLI Extensions</summary>
+
+To install Gemini CLI Extensions for MCP Toolbox, run the following command:
+
+```sh
+gemini extensions install https://github.com/gemini-cli-extensions/mcp-toolbox
+```
 
 </details>
 
@@ -151,11 +219,83 @@ go install github.com/googleapis/genai-toolbox@v0.9.0
 [Configure](#configuration) a `tools.yaml` to define your tools, and then
 execute `toolbox` to start the server:
 
+<details open>
+<summary>Binary</summary>
+
+To run Toolbox from binary:
+
 ```sh
 ./toolbox --tools-file "tools.yaml"
 ```
-> [!NOTE]
-> Toolbox enables dynamic reloading by default. To disable, use the `--disable-reload` flag.
+
+> ⓘ Note  
+> Toolbox enables dynamic reloading by default. To disable, use the
+> `--disable-reload` flag.
+
+</details>
+
+<details>
+
+<summary>Container image</summary>
+
+To run the server after pulling the [container image](#installing-the-server):
+
+```sh
+export VERSION=0.11.0 # Use the version you pulled
+docker run -p 5000:5000 \
+-v $(pwd)/tools.yaml:/app/tools.yaml \
+us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:$VERSION \
+--tools-file "/app/tools.yaml"
+```
+
+> ⓘ Note  
+> The `-v` flag mounts your local `tools.yaml` into the container, and `-p` maps
+> the container's port `5000` to your host's port `5000`.
+
+</details>
+
+<details>
+
+<summary>Source</summary>
+
+To run the server directly from source, navigate to the project root directory
+and run:
+
+```sh
+go run .
+```
+
+> ⓘ Note  
+> This command runs the project from source, and is more suitable for development
+> and testing. It does **not** compile a binary into your `$GOPATH`. If you want
+> to compile a binary instead, refer the [Developer
+> Documentation](./DEVELOPER.md#building-the-binary).
+
+</details>
+
+<details>
+
+<summary>Homebrew</summary>
+
+If you installed Toolbox using [Homebrew](https://brew.sh/), the `toolbox`
+binary is available in your system path. You can start the server with the same
+command:
+
+```sh
+toolbox --tools-file "tools.yaml"
+```
+
+</details>
+
+<details>
+
+<summary>Gemini CLI</summary>
+
+Interact with your custom tools using natural language. Check
+[gemini-cli-extensions/mcp-toolbox](https://github.com/gemini-cli-extensions/mcp-toolbox)
+for more information.
+
+</details>
 
 You can use `toolbox help` for a full list of flags! To stop the server, send a
 terminate signal (`ctrl+c` on most platforms).
@@ -485,12 +625,11 @@ For more detailed instructions on using the Toolbox Core SDK, see the
     package main
     import (
       "context"
-      "encoding/json"
+      "log"
 
-      "github.com/firebase/genkit/go/ai"
       "github.com/firebase/genkit/go/genkit"
       "github.com/googleapis/mcp-toolbox-sdk-go/core"
-      "github.com/invopop/jsonschema"
+      "github.com/googleapis/mcp-toolbox-sdk-go/tbgenkit"
     )
 
     func main() {
@@ -498,37 +637,20 @@ For more detailed instructions on using the Toolbox Core SDK, see the
       // Update the url to point to your server
       URL := "http://127.0.0.1:5000"
       ctx := context.Background()
-      g, err := genkit.Init(ctx)
+      g := genkit.Init(ctx)
 
       client, err := core.NewToolboxClient(URL)
 
       // Framework agnostic tool
       tool, err := client.LoadTool("toolName", ctx)
 
-      // Fetch the tool's input schema
-      inputschema, err := tool.InputSchema()
-
-      var schema *jsonschema.Schema
-      _ = json.Unmarshal(inputschema, &schema)
-
-      executeFn := func(ctx *ai.ToolContext, input any) (string, error) {
-        result, err := tool.Invoke(ctx, input.(map[string]any))
-        if err != nil {
-          // Propagate errors from the tool invocation.
-          return "", err
-        }
-
-        return result.(string), nil
-      }
-
+      // Convert the tool using the tbgenkit package
       // Use this tool with Genkit Go
-      genkitTool := genkit.DefineToolWithInputSchema(
-        g,
-        tool.Name(),
-        tool.Description(),
-        schema,
-        executeFn,
-      )
+      genkitTool, err := tbgenkit.ToGenkitTool(tool, g)
+      if err != nil {
+        log.Fatalf("Failed to convert tool: %v\n", err)
+      }
+      log.Printf("Successfully converted tool: %s", genkitTool.Name())
     }
     ```
 
@@ -720,12 +842,28 @@ my_second_toolset = client.load_toolset("my_second_toolset")
 
 ## Versioning
 
-This project uses [semantic versioning](https://semver.org/), including a
-`MAJOR.MINOR.PATCH` version number that increments with:
+This project uses [semantic versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+Since the project is in a pre-release stage (version `0.x.y`), we follow the
+standard conventions for initial  development:
 
-- MAJOR version when we make incompatible API changes
-- MINOR version when we add functionality in a backward compatible manner
-- PATCH version when we make backward compatible bug fixes
+### Pre-1.0.0 Versioning
+
+While the major version is `0`, the public API should be considered unstable.
+The version will be incremented  as follows:
+
+- **`0.MINOR.PATCH`**: The **MINOR** version is incremented when we add
+  new functionality or make breaking, incompatible API changes.
+- **`0.MINOR.PATCH`**: The **PATCH** version is incremented for
+  backward-compatible bug fixes.
+
+### Post-1.0.0 Versioning
+
+Once the project reaches a stable `1.0.0` release, the versioning will follow
+the more common convention:
+
+- **`MAJOR.MINOR.PATCH`**: Incremented for incompatible API changes.
+- **`MAJOR.MINOR.PATCH`**: Incremented for new, backward-compatible functionality.
+- **`MAJOR.MINOR.PATCH`**: Incremented for backward-compatible bug fixes.
 
 The public API that this applies to is the CLI associated with Toolbox, the
 interactions with official SDKs, and the definitions in the `tools.yaml` file.

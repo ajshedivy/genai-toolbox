@@ -11,18 +11,27 @@ description: >
 A `couchbase` source establishes a connection to a Couchbase database cluster,
 allowing tools to execute SQL queries against it.
 
+## Available Tools
+
+- [`couchbase-sql`](../tools/couchbase/couchbase-sql.md)  
+  Run SQL++ statements on Couchbase with parameterized input.
+
 ## Example
 
 ```yaml
 sources:
     my-couchbase-instance:
         kind: couchbase
-        connectionString: couchbase://localhost:8091
+        connectionString: couchbase://localhost
         bucket: travel-sample
         scope: inventory
         username: Administrator
         password: password
 ```
+
+{{< notice note >}}
+For more details about alternate addresses and custom ports refer to [Managing Connections](https://docs.couchbase.com/java-sdk/current/howtos/managing-connections.html).
+{{< /notice >}}
 
 ## Reference
 

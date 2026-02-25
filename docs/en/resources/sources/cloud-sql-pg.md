@@ -18,7 +18,35 @@ If you are new to Cloud SQL for PostgreSQL, you can try [creating and connecting
 to a database by following these instructions][csql-pg-quickstart].
 
 [csql-pg-docs]: https://cloud.google.com/sql/docs/postgres
-[csql-pg-quickstart]: https://cloud.google.com/sql/docs/postgres/connect-instance-local-computer
+[csql-pg-quickstart]:
+    https://cloud.google.com/sql/docs/postgres/connect-instance-local-computer
+
+## Available Tools
+
+- [`postgres-sql`](../tools/postgres/postgres-sql.md)
+  Execute SQL queries as prepared statements in PostgreSQL.
+
+- [`postgres-execute-sql`](../tools/postgres/postgres-execute-sql.md)
+  Run parameterized SQL statements in PostgreSQL.
+
+- [`postgres-list-tables`](../tools/postgres/postgres-list-tables.md)
+  List tables in a PostgreSQL database.
+
+- [`postgres-list-active-queries`](../tools/postgres/postgres-list-active-queries.md)
+  List active queries in a PostgreSQL database.
+
+- [`postgres-list-available-extensions`](../tools/postgres/postgres-list-available-extensions.md)
+  List available extensions for installation in a PostgreSQL database.
+
+- [`postgres-list-installed-extensions`](../tools/postgres/postgres-list-installed-extensions.md)
+  List installed extensions in a PostgreSQL database.
+
+### Pre-built Configurations
+
+- [Cloud SQL for Postgres using
+  MCP](https://googleapis.github.io/genai-toolbox/how-to/connect-ide/cloud_sql_pg_mcp/)
+Connect your IDE to Cloud SQL for Postgres using Toolbox.
+
 
 ## Requirements
 
@@ -122,6 +150,6 @@ instead of hardcoding your secrets into the configuration file.
 | region    |  string  |     true     | Name of the GCP region that the cluster was created in (e.g. "us-central1").                                             |
 | instance  |  string  |     true     | Name of the Cloud SQL instance within the cluster (e.g. "my-instance").                                                  |
 | database  |  string  |     true     | Name of the Postgres database to connect to (e.g. "my_db").                                                              |
-| user      |  string  |     false    | Name of the Postgres user to connect as (e.g. "my-pg-user"). Defaults to IAM auth using [ADC][adc] email if unspecified. |
-| password  |  string  |     false    | Password of the Postgres user (e.g. "my-password"). Defaults to attempting IAM authentication if unspecified.            |
-| ipType    |  string  |     false    | IP Type of the Cloud SQL instance; must be one of `public` or `private`. Default: `public`.                              |
+| user      |  string  |    false     | Name of the Postgres user to connect as (e.g. "my-pg-user"). Defaults to IAM auth using [ADC][adc] email if unspecified. |
+| password  |  string  |    false     | Password of the Postgres user (e.g. "my-password"). Defaults to attempting IAM authentication if unspecified.            |
+| ipType    |  string  |    false     | IP Type of the Cloud SQL instance; must be one of `public`, `private`, or `psc`. Default: `public`.                      |

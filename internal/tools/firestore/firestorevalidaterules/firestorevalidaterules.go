@@ -87,12 +87,7 @@ func (cfg Config) Initialize(srcs map[string]sources.Source) (tools.Tool, error)
 
 	// Create parameters
 	parameters := createParameters()
-
-	mcpManifest := tools.McpManifest{
-		Name:        cfg.Name,
-		Description: cfg.Description,
-		InputSchema: parameters.McpManifest(),
-	}
+	mcpManifest := tools.GetMcpManifest(cfg.Name, cfg.Description, cfg.AuthRequired, parameters)
 
 	// finish tool setup
 	t := Tool{
@@ -151,18 +146,18 @@ type SourcePosition struct {
 
 // ValidationResult represents the result of rules validation
 type ValidationResult struct {
-	Valid          bool   `json:"valid"`
-	IssueCount     int    `json:"issueCount"`
-	FormattedIssues string `json:"formattedIssues,omitempty"`
-	RawIssues      []Issue `json:"rawIssues,omitempty"`
+	Valid           bool    `json:"valid"`
+	IssueCount      int     `json:"issueCount"`
+	FormattedIssues string  `json:"formattedIssues,omitempty"`
+	RawIssues       []Issue `json:"rawIssues,omitempty"`
 }
 
-func (t Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error) {
+func (t Tool) Invoke(ctx context.Context, params tools.ParamValues, accessToken tools.AccessToken) (any, error) {
 	mapParams := params.AsMap()
 
 	// Get source parameter
 	source, ok := mapParams[sourceKey].(string)
-	if !ok || source == ""{
+	if !ok || source == "" {
 		return nil, fmt.Errorf("invalid or missing '%s' parameter", sourceKey)
 	}
 
@@ -191,15 +186,15 @@ func (t Tool) Invoke(ctx context.Context, params tools.ParamValues) (any, error)
 
 	// Process the response
 	result := t.processValidationResponse(response, source)
-	
+
 	return result, nil
 }
 
 func (t Tool) processValidationResponse(response *firebaserules.TestRulesetResponse, source string) ValidationResult {
 	if len(response.Issues) == 0 {
 		return ValidationResult{
-			Valid:      true,
-			IssueCount: 0,
+			Valid:           true,
+			IssueCount:      0,
 			FormattedIssues: "✓ No errors detected. Rules are valid.",
 		}
 	}
@@ -289,4 +284,8 @@ func (t Tool) McpManifest() tools.McpManifest {
 
 func (t Tool) Authorized(verifiedAuthServices []string) bool {
 	return tools.IsAuthorized(t.AuthRequired, verifiedAuthServices)
+}
+
+func (t Tool) RequiresClientAuthorization() bool {
+	return false
 }

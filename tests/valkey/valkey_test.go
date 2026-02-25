@@ -100,20 +100,30 @@ func TestValkeyToolEndpoints(t *testing.T) {
 		t.Fatalf("toolbox didn't start successfully: %s", err)
 	}
 
-	tests.RunToolGetTest(t)
+	// Get configs for tests
+	select1Want, mcpMyFailToolWant, invokeParamWant, invokeIdNullWant, nullWant, mcpSelect1Want, mcpInvokeParamWant := tests.GetRedisValkeyWants()
 
-	select1Want, failInvocationWant, invokeParamWant, invokeParamWantNull, mcpInvokeParamWant := tests.GetRedisValkeyWants()
-	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeParamWantNull, true)
-	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
+	// Run tests
+	tests.RunToolGetTest(t)
+	tests.RunToolInvokeTest(t, select1Want,
+		tests.WithMyToolId3NameAliceWant(invokeParamWant),
+		tests.WithMyArrayToolWant(invokeParamWant),
+		tests.WithMyToolById4Want(invokeIdNullWant),
+		tests.WithNullWant(nullWant),
+	)
+	tests.RunMCPToolCallMethod(t, mcpMyFailToolWant, mcpSelect1Want,
+		tests.WithMcpMyToolId3NameAliceWant(mcpInvokeParamWant),
+	)
 }
 
 func setupValkeyDB(t *testing.T, ctx context.Context, client valkey.Client) func(*testing.T) {
-	keys := []string{"row1", "row2", "row3", "row4"}
+	keys := []string{"row1", "row2", "row3", "row4", "null"}
 	commands := [][]string{
 		{"HSET", keys[0], "name", "Alice", "id", "1"},
 		{"HSET", keys[1], "name", "Jane", "id", "2"},
 		{"HSET", keys[2], "name", "Sid", "id", "3"},
 		{"HSET", keys[3], "name", "", "id", "4"},
+		{"SET", keys[4], "null"},
 		{"HSET", tests.ServiceAccountEmail, "name", "Alice"},
 	}
 	builtCmds := make(valkey.Commands, len(commands))

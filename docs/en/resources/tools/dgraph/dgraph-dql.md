@@ -2,7 +2,7 @@
 title: "dgraph-dql"
 type: docs
 weight: 1
-description: > 
+description: >
   A "dgraph-dql" tool executes a pre-defined DQL statement against a Dgraph
   database.
 aliases:
@@ -14,7 +14,7 @@ aliases:
 A `dgraph-dql` tool executes a pre-defined DQL statement against a Dgraph
 database. It's compatible with any of the following sources:
 
-- [dgraph](../sources/dgraph.md)
+- [dgraph](../../sources/dgraph.md)
 
 To run a statement as a query, you need to set the config `isQuery=true`. For
 upserts or mutations, set `isQuery=false`. You can also configure timeout for a
@@ -113,12 +113,12 @@ tools:
 
 ## Reference
 
-| **field**   |                  **type**                  | **required** | **description**                                                                              |
-|-------------|:------------------------------------------:|:------------:|----------------------------------------------------------------------------------------------|
-| kind        |                   string                   |     true     | Must be "dgraph-dql".                                                                        |
-| source      |                   string                   |     true     | Name of the source the dql query should execute on.                                          |
-| description |                   string                   |     true     | Description of the tool that is passed to the LLM.                                           |
-| statement   |                   string                   |     true     | dql statement to execute                                                                     |
-| isQuery     |                  boolean                   |    false     | To run statement as query set true otherwise false                                           |
-| timeout     |                   string                   |    false     | To set timeout for query                                                                     |
-| parameters  | [parameters](_index#specifying-parameters) |    false     | List of [parameters](_index#specifying-parameters) that will be used with the dql statement. |
+| **field**   |                **type**                 | **required** | **description**                                                                           |
+|-------------|:---------------------------------------:|:------------:|-------------------------------------------------------------------------------------------|
+| kind        |                 string                  |     true     | Must be "dgraph-dql".                                                                     |
+| source      |                 string                  |     true     | Name of the source the dql query should execute on.                                       |
+| description |                 string                  |     true     | Description of the tool that is passed to the LLM.                                        |
+| statement   |                 string                  |     true     | dql statement to execute                                                                  |
+| isQuery     |                 boolean                 |    false     | To run statement as query set true otherwise false                                        |
+| timeout     |                 string                  |    false     | To set timeout for query                                                                  |
+| parameters  | [parameters](../#specifying-parameters) |    false     | List of [parameters](../#specifying-parameters) that will be used with the dql statement. |

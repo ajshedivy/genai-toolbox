@@ -97,20 +97,30 @@ func TestRedisToolEndpoints(t *testing.T) {
 		t.Fatalf("toolbox didn't start successfully: %s", err)
 	}
 
-	tests.RunToolGetTest(t)
+	// Get configs for tests
+	select1Want, mcpMyFailToolWant, invokeParamWant, invokeIdNullWant, nullWant, mcpSelect1Want, mcpInvokeParamWant := tests.GetRedisValkeyWants()
 
-	select1Want, failInvocationWant, invokeParamWant, invokeParamWantNull, mcpInvokeParamWant := tests.GetRedisValkeyWants()
-	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeParamWantNull, true)
-	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
+	// Run tests
+	tests.RunToolGetTest(t)
+	tests.RunToolInvokeTest(t, select1Want,
+		tests.WithMyToolId3NameAliceWant(invokeParamWant),
+		tests.WithMyArrayToolWant(invokeParamWant),
+		tests.WithMyToolById4Want(invokeIdNullWant),
+		tests.WithNullWant(nullWant),
+	)
+	tests.RunMCPToolCallMethod(t, mcpMyFailToolWant, mcpSelect1Want,
+		tests.WithMcpMyToolId3NameAliceWant(mcpInvokeParamWant),
+	)
 }
 
 func setupRedisDB(t *testing.T, ctx context.Context, client *redis.Client) func(*testing.T) {
-	keys := []string{"row1", "row2", "row3", "row4"}
+	keys := []string{"row1", "row2", "row3", "row4", "null"}
 	commands := [][]any{
 		{"HSET", keys[0], "id", 1, "name", "Alice"},
 		{"HSET", keys[1], "id", 2, "name", "Jane"},
 		{"HSET", keys[2], "id", 3, "name", "Sid"},
 		{"HSET", keys[3], "id", 4, "name", nil},
+		{"SET", keys[4], "null"},
 		{"HSET", tests.ServiceAccountEmail, "name", "Alice"},
 	}
 	for _, c := range commands {

@@ -91,7 +91,7 @@ func initSpannerClients(ctx context.Context, project, instance, dbname string) (
 
 func TestSpannerToolEndpoints(t *testing.T) {
 	sourceConfig := getSpannerVars(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var args []string
@@ -108,7 +108,7 @@ func TestSpannerToolEndpoints(t *testing.T) {
 	tableNameTemplateParam := "template_param_table_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 
 	// set up data for param tool
-	createParamTableStmt, insertParamTableStmt, paramToolStmt, paramToolStmt2, arrayToolStmt, paramTestParams := getSpannerParamToolInfo(tableNameParam)
+	createParamTableStmt, insertParamTableStmt, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, paramTestParams := getSpannerParamToolInfo(tableNameParam)
 	dbString := fmt.Sprintf(
 		"projects/%s/instances/%s/databases/%s",
 		SpannerProject,
@@ -129,10 +129,11 @@ func TestSpannerToolEndpoints(t *testing.T) {
 	defer teardownTableTmpl(t)
 
 	// Write config into a file and pass it to command
-	toolsFile := tests.GetToolsConfig(sourceConfig, SpannerToolKind, paramToolStmt, paramToolStmt2, arrayToolStmt, authToolStmt)
+	toolsFile := tests.GetToolsConfig(sourceConfig, SpannerToolKind, paramToolStmt, idParamToolStmt, nameParamToolStmt, arrayToolStmt, authToolStmt)
 	toolsFile = addSpannerExecuteSqlConfig(t, toolsFile)
 	toolsFile = addSpannerReadOnlyConfig(t, toolsFile)
 	toolsFile = addTemplateParamConfig(t, toolsFile)
+	toolsFile = addSpannerListTablesConfig(t, toolsFile)
 
 	cmd, cleanup, err := tests.StartCmd(ctx, toolsFile, args...)
 	if err != nil {
@@ -148,37 +149,46 @@ func TestSpannerToolEndpoints(t *testing.T) {
 		t.Fatalf("toolbox didn't start successfully: %s", err)
 	}
 
-	tests.RunToolGetTest(t)
-
+	// Get configs for tests
 	select1Want := "[{\"\":\"1\"}]"
-	accessSchemaWant := "[{\"schema_name\":\"INFORMATION_SCHEMA\"}]"
 	invokeParamWant := "[{\"id\":\"1\",\"name\":\"Alice\"},{\"id\":\"3\",\"name\":\"Sid\"}]"
-	invokeParamWantNull := `[{"id":"4","name":null}]`
-	mcpInvokeParamWant := `{"jsonrpc":"2.0","id":"my-param-tool","result":{"content":[{"type":"text","text":"{\"id\":\"1\",\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":\"3\",\"name\":\"Sid\"}"}]}}`
-	failInvocationWant := `"jsonrpc":"2.0","id":"invoke-fail-tool","result":{"content":[{"type":"text","text":"unable to execute client: unable to parse row: spanner: code = \"InvalidArgument\", desc = \"Syntax error: Unexpected identifier \\\\\\\"SELEC\\\\\\\" [at 1:1]\\\\nSELEC 1;\\\\n^\"`
+	accessSchemaWant := "[{\"schema_name\":\"INFORMATION_SCHEMA\"}]"
+	toolInvokeMyToolById4Want := `[{"id":"4","name":null}]`
+	mcpMyFailToolWant := `"jsonrpc":"2.0","id":"invoke-fail-tool","result":{"content":[{"type":"text","text":"unable to execute client: unable to parse row: spanner: code = \"InvalidArgument\", desc = \"Syntax error: Unexpected identifier \\\\\\\"SELEC\\\\\\\" [at 1:1]\\\\nSELEC 1;\\\\n^\"`
+	mcpMyToolId3NameAliceWant := `{"jsonrpc":"2.0","id":"my-tool","result":{"content":[{"type":"text","text":"{\"id\":\"1\",\"name\":\"Alice\"}"},{"type":"text","text":"{\"id\":\"3\",\"name\":\"Sid\"}"}]}}`
+	mcpSelect1Want := `{"jsonrpc":"2.0","id":"invoke my-auth-required-tool","result":{"content":[{"type":"text","text":"{\"\":\"1\"}"}]}}`
+	tmplSelectAllWwant := "[{\"age\":\"21\",\"id\":\"1\",\"name\":\"Alex\"},{\"age\":\"100\",\"id\":\"2\",\"name\":\"Alice\"}]"
+	tmplSelectId1Want := "[{\"age\":\"21\",\"id\":\"1\",\"name\":\"Alex\"}]"
 
-	tests.RunToolInvokeTest(t, select1Want, invokeParamWant, invokeParamWantNull, true)
-	tests.RunMCPToolCallMethod(t, mcpInvokeParamWant, failInvocationWant)
+	// Run tests
+	tests.RunToolGetTest(t)
+	tests.RunToolInvokeTest(t, select1Want,
+		tests.WithMyToolId3NameAliceWant(invokeParamWant),
+		tests.WithMyArrayToolWant(invokeParamWant),
+		tests.WithMyToolById4Want(toolInvokeMyToolById4Want),
+	)
+	tests.RunMCPToolCallMethod(t, mcpMyFailToolWant, mcpSelect1Want, tests.WithMcpMyToolId3NameAliceWant(mcpMyToolId3NameAliceWant))
+	tests.RunToolInvokeWithTemplateParameters(
+		t, tableNameTemplateParam,
+		tests.WithSelectAllWant(tmplSelectAllWwant),
+		tests.WithTmplSelectId1Want(tmplSelectId1Want),
+		tests.DisableDdlTest(),
+	)
 	runSpannerSchemaToolInvokeTest(t, accessSchemaWant)
 	runSpannerExecuteSqlToolInvokeTest(t, select1Want, invokeParamWant, tableNameParam, tableNameAuth)
-
-	templateParamTestConfig := tests.NewTemplateParameterTestConfig(
-		tests.WithIgnoreDdl(),
-		tests.WithSelectAllWant("[{\"age\":\"21\",\"id\":\"1\",\"name\":\"Alex\"},{\"age\":\"100\",\"id\":\"2\",\"name\":\"Alice\"}]"),
-		tests.WithSelect1Want("[{\"age\":\"21\",\"id\":\"1\",\"name\":\"Alex\"}]"),
-	)
-	tests.RunToolInvokeWithTemplateParameters(t, tableNameTemplateParam, templateParamTestConfig)
+	runSpannerListTablesTest(t, tableNameParam, tableNameAuth, tableNameTemplateParam)
 }
 
-// getSpannerToolInfo returns statements and param for my-param-tool for spanner-sql kind
-func getSpannerParamToolInfo(tableName string) (string, string, string, string, string, map[string]any) {
+// getSpannerToolInfo returns statements and param for my-tool for spanner-sql kind
+func getSpannerParamToolInfo(tableName string) (string, string, string, string, string, string, map[string]any) {
 	createStatement := fmt.Sprintf("CREATE TABLE %s (id INT64, name STRING(MAX)) PRIMARY KEY (id)", tableName)
 	insertStatement := fmt.Sprintf("INSERT INTO %s (id, name) VALUES (1, @name1), (2, @name2), (3, @name3), (4, @name4)", tableName)
 	toolStatement := fmt.Sprintf("SELECT * FROM %s WHERE id = @id OR name = @name", tableName)
-	toolStatement2 := fmt.Sprintf("SELECT * FROM %s WHERE id = @id", tableName)
+	idToolStatement := fmt.Sprintf("SELECT * FROM %s WHERE id = @id", tableName)
+	nameToolStatement := fmt.Sprintf("SELECT * FROM %s WHERE name = @name", tableName)
 	arrayToolStatement := fmt.Sprintf("SELECT * FROM %s WHERE id IN UNNEST(@idArray) AND name IN UNNEST(@nameArray)", tableName)
 	params := map[string]any{"name1": "Alice", "name2": "Jane", "name3": "Sid", "name4": nil}
-	return createStatement, insertStatement, toolStatement, toolStatement2, arrayToolStatement, params
+	return createStatement, insertStatement, toolStatement, idToolStatement, nameToolStatement, arrayToolStatement, params
 }
 
 // getSpannerAuthToolInfo returns statements and param of my-auth-tool for spanner-sql kind
@@ -292,6 +302,24 @@ func addSpannerReadOnlyConfig(t *testing.T, config map[string]any) map[string]an
 		"description": "Tool to access information schema.",
 		"statement":   "SELECT schema_name FROM `INFORMATION_SCHEMA`.SCHEMATA WHERE schema_name='INFORMATION_SCHEMA';",
 	}
+	config["tools"] = tools
+	return config
+}
+
+// addSpannerListTablesConfig adds the spanner-list-tables tool configuration
+func addSpannerListTablesConfig(t *testing.T, config map[string]any) map[string]any {
+	tools, ok := config["tools"].(map[string]any)
+	if !ok {
+		t.Fatalf("unable to get tools from config")
+	}
+
+	// Add spanner-list-tables tool
+	tools["list-tables-tool"] = map[string]any{
+		"kind":        "spanner-list-tables",
+		"source":      "my-instance",
+		"description": "Lists tables with their schema information",
+	}
+
 	config["tools"] = tools
 	return config
 }
@@ -516,6 +544,117 @@ func runSpannerExecuteSqlToolInvokeTest(t *testing.T, select1Want, invokeParamWa
 			if got != tc.want {
 				t.Fatalf("unexpected value: got %q, want %q", got, tc.want)
 			}
+		})
+	}
+}
+
+// Helper function to verify table list results
+func verifyTableListResult(t *testing.T, body map[string]interface{}, expectedTables []string, expectedSimpleFormat bool) {
+	// Parse the result
+	result, ok := body["result"].(string)
+	if !ok {
+		t.Fatalf("unable to find result in response body")
+	}
+
+	var tables []interface{}
+	err := json.Unmarshal([]byte(result), &tables)
+	if err != nil {
+		t.Fatalf("unable to parse result as JSON array: %s", err)
+	}
+
+	// If we expect specific tables, verify they exist
+	if len(expectedTables) > 0 {
+		tableNames := make(map[string]bool)
+		requiredKeys := []string{"schema_name", "object_name", "object_type", "columns", "constraints", "indexes"}
+		if expectedSimpleFormat {
+			requiredKeys = []string{"name"}
+		}
+
+		for _, table := range tables {
+			tableMap, ok := table.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			// Parse object_details JSON string into map[string]interface{}
+			if objectDetailsStr, ok := tableMap["object_details"].(string); ok {
+				var objectDetails map[string]interface{}
+				if err := json.Unmarshal([]byte(objectDetailsStr), &objectDetails); err != nil {
+					t.Errorf("failed to parse object_details JSON: %v for %v", err, objectDetailsStr)
+					continue
+				}
+
+				for _, reqKey := range requiredKeys {
+					if _, hasKey := objectDetails[reqKey]; !hasKey {
+						t.Errorf("missing required key '%s', for object_details: %v", reqKey, objectDetails)
+					}
+				}
+			}
+
+			if name, ok := tableMap["object_name"].(string); ok {
+				tableNames[name] = true
+			}
+		}
+
+		for _, expected := range expectedTables {
+			if !tableNames[expected] {
+				t.Errorf("expected table %s not found in results", expected)
+			}
+		}
+	}
+}
+
+// runSpannerListTablesTest tests the spanner-list-tables tool
+func runSpannerListTablesTest(t *testing.T, tableNameParam, tableNameAuth, tableNameTemplateParam string) {
+	invokeTcs := []struct {
+		name            string
+		requestBody     io.Reader
+		expectedTables  []string // empty means don't check specific tables
+		useSimpleFormat bool
+	}{
+		{
+			name:           "list all tables with detailed format",
+			requestBody:    bytes.NewBuffer([]byte(`{}`)),
+			expectedTables: []string{tableNameParam, tableNameAuth, tableNameTemplateParam},
+		},
+		{
+			name:            "list tables with simple format",
+			requestBody:     bytes.NewBuffer([]byte(`{"output_format": "simple"}`)),
+			expectedTables:  []string{tableNameParam, tableNameAuth, tableNameTemplateParam},
+			useSimpleFormat: true,
+		},
+		{
+			name:           "list specific tables",
+			requestBody:    bytes.NewBuffer([]byte(fmt.Sprintf(`{"table_names": "%s,%s"}`, tableNameParam, tableNameAuth))),
+			expectedTables: []string{tableNameParam, tableNameAuth},
+		},
+		{
+			name:           "list non-existent table",
+			requestBody:    bytes.NewBuffer([]byte(`{"table_names": "non_existent_table_xyz"}`)),
+			expectedTables: []string{},
+		},
+	}
+
+	for _, tc := range invokeTcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// Use RunRequest helper function from tests package
+			url := "http://127.0.0.1:5000/api/tool/list-tables-tool/invoke"
+			headers := map[string]string{}
+
+			resp, respBody := tests.RunRequest(t, http.MethodPost, url, tc.requestBody, headers)
+
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("response status code is not 200, got %d: %s", resp.StatusCode, string(respBody))
+			}
+
+			// Check response body
+			var body map[string]interface{}
+			err := json.Unmarshal(respBody, &body)
+			if err != nil {
+				t.Fatalf("error parsing response body: %s", err)
+			}
+
+			verifyTableListResult(t, body, tc.expectedTables, tc.useSimpleFormat)
 		})
 	}
 }
