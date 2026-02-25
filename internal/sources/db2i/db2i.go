@@ -30,13 +30,14 @@ func newConfig(ctx context.Context, name string, decoder *yaml.Decoder) (sources
 }
 
 type Config struct {
-	Name     string `yaml:"name" validate:"required"`
-	Kind     string `yaml:"kind" validate:"required"`
-	Host     string `yaml:"host" validate:"required"`
-	Port     string `yaml:"port" validate:"required"`
-	User     string `yaml:"user" validate:"required"`
-	Password string `yaml:"password" validate:"required"`
-	Database string `yaml:"database" validate:"required"`
+	Name       string `yaml:"name" validate:"required"`
+	Kind       string `yaml:"kind" validate:"required"`
+	Host       string `yaml:"host" validate:"required"`
+	Port       string `yaml:"port" validate:"required"`
+	User       string `yaml:"user" validate:"required"`
+	Password   string `yaml:"password" validate:"required"`
+	Database   string `yaml:"database" validate:"required"`
+	Properties string `yaml:"properties"`
 }
 
 func (r Config) SourceConfigKind() string {
@@ -45,7 +46,7 @@ func (r Config) SourceConfigKind() string {
 
 func (r Config) Initialize(ctx context.Context, tracer trace.Tracer) (sources.Source, error) {
 
-	pool, err := initDb2iConnectionPool(ctx, tracer, r.Name, r.Host, r.Port, r.User, r.Password)
+	pool, err := initDb2iConnectionPool(ctx, tracer, r.Name, r.Host, r.Port, r.User, r.Password, r.Properties)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pool: %w", err)
 	}
@@ -72,7 +73,7 @@ func (s *Source) Db2iPool() *mapepire.JobPool {
 	return s.Pool
 }
 
-func initDb2iConnectionPool(ctx context.Context, tracer trace.Tracer, name, host, port, user, password string) (*mapepire.JobPool, error) {
+func initDb2iConnectionPool(ctx context.Context, tracer trace.Tracer, name, host, port, user, password, properties string) (*mapepire.JobPool, error) {
 	//nolint:all // Reassigned ctx
 	ctx, span := sources.InitConnectionSpan(ctx, tracer, SourceKind, name)
 	defer span.End()
@@ -97,7 +98,8 @@ func initDb2iConnectionPool(ctx context.Context, tracer trace.Tracer, name, host
 		User:               user,
 		Password:           password,
 		IgnoreUnauthorized: true,
-		Technique:          "tcp", // Use TCP connection
+		Technique:          "tcp",
+		Properties:         properties,
 	}
 	options := mapepire.PoolOptions{Creds: creds, MaxSize: 5, StartingSize: 3, MaxWaitTime: 1}
 	pool, err := mapepire.NewPool(options)
