@@ -29,14 +29,22 @@ tools:
         default: 10
         description: "Number of top CPU consumers to return"
     statement: |
-      SELECT CPU_TIME, A.* FROM 
-      TABLE(QSYS2.ACTIVE_JOB_INFO(SUBSYSTEM_LIST_FILTER => 'QUSRWRK,QSYSWRK')) A 
-      ORDER BY CPU_TIME DESC 
+      SELECT CPU_TIME, A.* FROM
+      TABLE(QSYS2.ACTIVE_JOB_INFO(SUBSYSTEM_LIST_FILTER => 'QUSRWRK,QSYSWRK')) A
+      ORDER BY CPU_TIME DESC
       FETCH FIRST ? ROWS ONLY
 
+  list_tables:
+    source: ibmi-system
+    kind: db2i-list-tables
+    description: "List tables, views, and aliases in a given schema (library) with column details. Returns table name, type, text description, row count, and column metadata."
 
 toolsets:
   performance:
       - execute_sql
       - system_status
       - active_job_info
+
+  database_tools:
+      - execute_sql
+      - list_tables

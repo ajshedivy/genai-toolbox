@@ -85,6 +85,7 @@ import (
 	_ "github.com/googleapis/genai-toolbox/internal/tools/dataplex/dataplexsearchaspecttypes"
 	_ "github.com/googleapis/genai-toolbox/internal/tools/dataplex/dataplexsearchentries"
 	_ "github.com/googleapis/genai-toolbox/internal/tools/db2i/db2iexecutesql"
+	_ "github.com/googleapis/genai-toolbox/internal/tools/db2i/db2ilisttables"
 	_ "github.com/googleapis/genai-toolbox/internal/tools/db2i/db2isql"
 	_ "github.com/googleapis/genai-toolbox/internal/tools/dgraph"
 	_ "github.com/googleapis/genai-toolbox/internal/tools/firebird/firebirdexecutesql"
