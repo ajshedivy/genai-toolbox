@@ -36,6 +36,7 @@ var expectedToolSources = []string{
 	"cloud-sql-postgres-observability",
 	"cloud-sql-postgres",
 	"dataplex",
+	"db2i",
 	"firestore",
 	"looker-conversational-analytics",
 	"looker",
@@ -108,6 +109,7 @@ func TestGetPrebuiltTool(t *testing.T) {
 	cloudsqlmssql_observability_config, _ := Get("cloud-sql-mssql-observability")
 	cloudsqlmssql_config, _ := Get("cloud-sql-mssql")
 	dataplex_config, _ := Get("dataplex")
+	db2i_config, _ := Get("db2i")
 	firestoreconfig, _ := Get("firestore")
 	looker_config, _ := Get("looker")
 	lookerca_config, _ := Get("looker-conversational-analytics")
@@ -163,6 +165,9 @@ func TestGetPrebuiltTool(t *testing.T) {
 	}
 	if len(dataplex_config) <= 0 {
 		t.Fatalf("unexpected error: could not fetch dataplex prebuilt tools yaml")
+	}
+	if len(db2i_config) <= 0 {
+		t.Fatalf("unexpected error: could not fetch db2i prebuilt tools yaml")
 	}
 	if len(firestoreconfig) <= 0 {
 		t.Fatalf("unexpected error: could not fetch firestore prebuilt tools yaml")
